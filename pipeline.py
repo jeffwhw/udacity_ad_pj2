@@ -4,12 +4,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import glob
+import os
 
 test_distort = False
 test_edge_detc = False
 test_perspective = False
 test_fitpoly = False
 test_curve = False
+
+os.chdir('F:\\code\\udacity_carnd\\Project2\\udacity_ad_pj2')
 
 #%% prepare the calibration data based on calibration images
 def calibrate_prepare(images):
