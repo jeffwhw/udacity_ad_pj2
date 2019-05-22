@@ -54,16 +54,12 @@ def calibrate_prepare(images):
 images = glob.glob('camera_cal/calibration*.jpg')
 mtx, dist = calibrate_prepare(images)
 
-#%% read raw image and undistort the image using calibration data
-
-raw = mpimg.imread('test_images/test2.jpg')
+#%%  undistort the image using calibration data
 
 def undistort_image(raw, mtx, dist):
     undist = cv2.undistort(raw, mtx, dist, None, mtx)
     
     return undist
-
-img_undist = undistort_image(raw, mtx, dist)
 
 if test_distort: 
     raw = cv2.imread('camera_cal/calibration12.jpg')
@@ -78,7 +74,7 @@ if test_distort:
     ax2.set_title('Undistorted Image', fontsize=50)
     plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
 
-#%% detect the line edges using a combination of absolute sobel threshold 
+# detect the line edges using a combination of absolute sobel threshold 
 # and S channel threshold
 
 def detc_edge(img, s_thresh=(170, 255), sx_thresh=(22, 100)):
@@ -120,10 +116,10 @@ if test_edge_detc:
 
         ksize = 3
 
-        gradx = abs_sobel_thresh(image, orient='x', sobel_kernel=ksize, thresh = (10,100))
-        grady = abs_sobel_thresh(image, orient='y', sobel_kernel=ksize, thresh = (10,100))
-        mag_binary = mag_thresh(image, sobel_kernel=ksize, mag_thresh=(15, 100))
-        dir_binary = dir_thres(image, sobel_kernel=ksize, thresh=(0.7, 1.2))
+        # gradx = abs_sobel_thresh(image, orient='x', sobel_kernel=ksize, thresh = (10,100))
+        # grady = abs_sobel_thresh(image, orient='y', sobel_kernel=ksize, thresh = (10,100))
+        # mag_binary = mag_thresh(image, sobel_kernel=ksize, mag_thresh=(15, 100))
+        # dir_binary = dir_thres(image, sobel_kernel=ksize, thresh=(0.7, 1.2))
 
         img_edges = np.zeros_like(dir_binary)
         #img_edges[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
@@ -157,21 +153,21 @@ if test_edge_detc:
     ax6.imshow(ret_list[5], cmap='gray')
     plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
 
-color_binary, img_edges = detc_edge(img_undist)
+#change perspective
 
-#%% change perspective
+def perspective_change(img, reverse = False):
 
-def perspective_change(img):
-
-    src = np.float32([(264,670), (579,460), (703,460), (1042,670) ])
-    dest = np.float32([(264,670), (264,100), (1042,100), (1042,670)])
+    if reverse == False: 
+        src = np.float32([(264,670), (579,460), (703,460), (1042,670) ])
+        dest = np.float32([(264,670), (264,100), (1042,100), (1042,670)])
+    else: 
+        dest = np.float32([(264,670), (579,460), (703,460), (1042,670) ])
+        src = np.float32([(264,670), (264,100), (1042,100), (1042,670)])
 
     M = cv2.getPerspectiveTransform(src, dest)
     warped = cv2.warpPerspective(img, M, (img.shape[1],img.shape[0]), flags=cv2.INTER_LINEAR)
     
     return warped, M
-
-img_topdown, perspective_M = perspective_change(img_edges)
 
 if test_perspective:
     raw = mpimg.imread('test_images/straight_lines1.jpg')
@@ -194,7 +190,7 @@ if test_perspective:
     ax2.plot([1042,264], [670, 670], color='r', linestyle='-', linewidth=2)
     plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
 
-#%% find line points and fit to 2D polynomial
+# find line points and fit to 2D polynomial
 def find_lanes(binary_warped):
     # Take a histogram of the bottom half of the image
     histogram = np.sum(binary_warped[binary_warped.shape[0]//2:,:], axis=0)
@@ -303,8 +299,6 @@ def draw_fit_lines(img, left_fit, right_fit, ax):
 
     return
 
-img_linefit, left_fit, right_fit = find_lanes(img_topdown)
-
 if test_fitpoly:     
     binary_warped = mpimg.imread('F:\\code\\udacity_carnd\\Project2\\CarND-Advanced-Lane-Lines\\warped-example.jpg')
     out_img = find_lanes(binary_warped)
@@ -324,10 +318,22 @@ def measure_curvature_pixels(max_y, left_fit_cr, right_fit_cr):
     
     return left_curverad, right_curverad
 
+#%%
+
+raw = mpimg.imread('test_images/test3.jpg')
+
+img_undist = undistort_image(raw, mtx, dist)
+
+img_topdown, perspective_M = perspective_change(img_edges)
+
+color_binary, img_edges = detc_edge(img_undist)
+
+img_linefit, left_fit, right_fit = find_lanes(img_topdown)
+
 left_curverad, right_curverad = measure_curvature_pixels(np.max(img_linefit.shape[0]), left_fit, right_fit)
 print(left_curverad, right_curverad)
 
-#%%
+img_warpback, perspective_M = perspective_change(img_linefit, reverse=True)
 
 f, ((ax1,ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(3, 2, figsize=(24, 27))
 f.tight_layout()
@@ -336,9 +342,9 @@ ax1.imshow(raw)
 ax2.imshow(img_undist)
 ax3.imshow(img_edges, cmap='gray')
 ax4.imshow(img_topdown, cmap='gray')
-ax5.imshow(img_linefit, cmap='gray')
-draw_fit_lines(img_linefit, left_fit, right_fit, ax5)
-ax6.imshow(img_linefit, cmap='gray')
+ax5.imshow(img_topdown, cmap='gray')
+draw_fit_lines(img_topdown, left_fit, right_fit, ax5)
+ax6.imshow(img_warpback, cmap='gray')
 plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
 
 
