@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import glob
 import os
+from PIL import Image
 
 test_distort = False
 test_edge_detc = False
@@ -237,8 +238,8 @@ def find_lanes(binary_warped):
         win_xright_high = rightx_current+margin  # Update this
         
         # Draw the windows on the visualization image
-        cv2.rectangle(out_img,(win_xleft_low,win_y_low), (win_xleft_high,win_y_high),(0,255,0), 2) 
-        cv2.rectangle(out_img,(win_xright_low,win_y_low), (win_xright_high,win_y_high),(0,255,0), 2)        
+        #cv2.rectangle(out_img,(win_xleft_low,win_y_low), (win_xleft_high,win_y_high),(0,255,0), 2) 
+        #cv2.rectangle(out_img,(win_xright_low,win_y_low), (win_xright_high,win_y_high),(0,255,0), 2)        
         
         good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & \
             (nonzerox >= win_xleft_low) &  (nonzerox < win_xleft_high)).nonzero()[0]
@@ -270,20 +271,12 @@ def find_lanes(binary_warped):
     rightx = nonzerox[right_lane_inds]
     righty = nonzeroy[right_lane_inds]
 
-    # Colors in the left and right lane regions
-    out_img[lefty, leftx] = [255, 0, 0]
-    out_img[righty, rightx] = [0, 0, 255]
-
     # Fit a second order polynomial to each 
     left_fit = np.polyfit(lefty, leftx, 2)
     right_fit = np.polyfit(righty, rightx, 2)
 
-    return out_img, left_fit, right_fit
-
-
-def draw_fit_lines(img, left_fit, right_fit, ax):
-    # Generate x and y values for plotting
-    ploty = np.linspace(0, img.shape[0]-1, img.shape[0] )
+    # Draw the fit line plain
+    ploty = np.linspace(0, out_img.shape[0]-1, out_img.shape[0] )
     try:
         left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
         right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
@@ -293,11 +286,22 @@ def draw_fit_lines(img, left_fit, right_fit, ax):
         left_fitx = 1*ploty**2 + 1*ploty
         right_fitx = 1*ploty**2 + 1*ploty
 
-    # Plots the left and right polynomials on the lane lines
-    ax.plot(left_fitx, ploty, color='yellow', linewidth=8)
-    ax.plot(right_fitx, ploty, color='yellow', linewidth=8)
+    ploty = ploty.astype(int)
+    left_fitx = left_fitx.astype(int)
+    right_fitx = right_fitx.astype(int)
 
-    return
+    # plot the plane on the detected lines
+    for i in range(0,len(ploty)):
+        cv2.line(out_img, (left_fitx[i]+10,ploty[i]), (right_fitx[i]-10,ploty[i]), \
+            (0,100,0), 2)
+
+    # Colors in the left and right lane regions
+    out_img[lefty, leftx] = [255, 0, 0]
+    out_img[righty, rightx] = [0, 0, 255]
+
+
+    return out_img, left_fit, right_fit
+
 
 if test_fitpoly:     
     binary_warped = mpimg.imread('F:\\code\\udacity_carnd\\Project2\\CarND-Advanced-Lane-Lines\\warped-example.jpg')
@@ -320,21 +324,30 @@ def measure_curvature_pixels(max_y, left_fit_cr, right_fit_cr):
 
 #%%
 
+# read raw images and undistort the image
 raw = mpimg.imread('test_images/test3.jpg')
 
 img_undist = undistort_image(raw, mtx, dist)
 
-img_topdown, perspective_M = perspective_change(img_edges)
-
+# detect edges
 color_binary, img_edges = detc_edge(img_undist)
 
-img_linefit, left_fit, right_fit = find_lanes(img_topdown)
+# transform perspective to top-down
+img_topdown, perspective_M = perspective_change(img_edges)
 
+# find lines and calculate curvature
+img_linefit, left_fit, right_fit = find_lanes(img_topdown)
+#draw_fit_lines(img_linefit, left_fit, right_fit)
 left_curverad, right_curverad = measure_curvature_pixels(np.max(img_linefit.shape[0]), left_fit, right_fit)
 print(left_curverad, right_curverad)
 
+# back-warp the line plotting
 img_warpback, perspective_M = perspective_change(img_linefit, reverse=True)
 
+# blend back-warped line plotting with undistored original image
+img_blended = cv2.addWeighted(img_undist, 0.7, img_warpback, 1.0, 0)
+
+# output intermediate steps 
 f, ((ax1,ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(3, 2, figsize=(24, 27))
 f.tight_layout()
 
@@ -342,14 +355,42 @@ ax1.imshow(raw)
 ax2.imshow(img_undist)
 ax3.imshow(img_edges, cmap='gray')
 ax4.imshow(img_topdown, cmap='gray')
-ax5.imshow(img_topdown, cmap='gray')
-draw_fit_lines(img_topdown, left_fit, right_fit, ax5)
-ax6.imshow(img_warpback, cmap='gray')
+ax5.imshow(img_linefit)
+ax6.imshow(img_blended)
 plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
 
+#%%
 
-#plt.savefig('top-down.png')
+# Import everything needed to edit/save/watch video clips
+from moviepy.editor import VideoFileClip
+from IPython.display import HTML
 
+def process_image(raw):
+    img_undist = undistort_image(raw, mtx, dist)
+
+    # detect edges
+    color_binary, img_edges = detc_edge(img_undist)
+
+    # transform perspective to top-down
+    img_topdown, perspective_M = perspective_change(img_edges)
+
+    # find lines and calculate curvature
+    img_linefit, left_fit, right_fit = find_lanes(img_topdown)
+    left_curverad, right_curverad = measure_curvature_pixels(np.max(img_linefit.shape[0]), left_fit, right_fit)
+
+    # back-warp the line plotting
+    img_warpback, perspective_M = perspective_change(img_linefit, reverse=True)
+
+    # blend back-warped line plotting with undistored original image
+    img_blended = cv2.addWeighted(img_undist, 0.7, img_warpback, 1.0, 0)
+
+    return img_blended
+
+white_output = 'output_images/project_video.mp4'
+#clip1 = VideoFileClip("project_video.mp4").subclip(0,2)
+clip1 = VideoFileClip("project_video.mp4")
+white_clip = clip1.fl_image(process_image) #NOTE: this function expects color images!!
+get_ipython().run_line_magic('time', 'white_clip.write_videofile(white_output, audio=False)')
 
 
 #%%
