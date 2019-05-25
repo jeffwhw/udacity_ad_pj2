@@ -105,6 +105,8 @@ def perspective_change(img, reverse = False):
     
     return warped, M
 
+from line_class import SingleLine
+
 # find line points and fit to 2D polynomial
 def find_lanes(binary_warped):
     # Take a histogram of the bottom half of the image
@@ -174,7 +176,6 @@ def find_lanes(binary_warped):
     left_lane_inds = np.concatenate(left_lane_inds)
     right_lane_inds = np.concatenate(right_lane_inds)
 
-
     # Extract left and right line pixel positions
     leftx = nonzerox[left_lane_inds]
     lefty = nonzeroy[left_lane_inds] 
@@ -205,7 +206,7 @@ def find_lanes(binary_warped):
     max_y = np.max(out_img.shape[0])
     left_curverad, right_curverad, left_dist, right_dist = \
         measure_curvature_pixels(max_y, middle_x, left_fit, right_fit)
-    print(left_curverad, right_curverad, left_dist, right_dist)
+    #print(left_curverad, right_curverad, left_dist, right_dist)
     
     # plot the plane on the detected lines
     for i in range(0,len(ploty)):
@@ -216,8 +217,11 @@ def find_lanes(binary_warped):
     out_img[lefty, leftx] = [255, 0, 0]
     out_img[righty, rightx] = [0, 0, 255]
 
+    # output all results to new line objects
+    left_line = SingleLine(True, left_fit, left_fitx, ploty, left_curverad, left_dist, leftx, lefty)
+    right_line = SingleLine(True, right_fit, right_fitx, ploty, right_curverad, right_dist, rightx, righty)
 
-    return out_img, left_fit, right_fit
+    return out_img, [left_line, right_line]
 
 #Calculates the curvature of polynomial functions in meters.
 def measure_curvature_pixels(max_y, middle_x, left_fit_cr, right_fit_cr):
@@ -250,7 +254,8 @@ color_binary, img_edges = detc_edge(img_undist)
 img_topdown, perspective_M = perspective_change(img_edges)
 
 # find lines and calculate curvature
-img_linefit, left_fit, right_fit = find_lanes(img_topdown)
+img_linefit, [left_line, right_line] = find_lanes(img_topdown)
+print(vars(left_line))
 
 # back-warp the line plotting
 img_warpback, perspective_M = perspective_change(img_linefit, reverse=True)
@@ -286,9 +291,8 @@ def process_image(raw):
     img_topdown, perspective_M = perspective_change(img_edges)
 
     # find lines and calculate curvature
-    img_linefit, left_fit, right_fit = find_lanes(img_topdown)
-    #left_curverad, right_curverad = measure_curvature_pixels(np.max(img_linefit.shape[0]), left_fit, right_fit)
-
+    img_linefit, [left_line, right_line] = find_lanes(img_topdown)
+    
     # back-warp the line plotting
     img_warpback, perspective_M = perspective_change(img_linefit, reverse=True)
 
