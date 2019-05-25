@@ -24,3 +24,22 @@ class Line():
         #y values for detected line pixels
         self.ally = None  
 
+    def rmse(self, value1, value2): 
+        return np.sqrt(np.mean((value1-value2)**2))
+
+    def sanity_check(self, new_fit, new_curvature, new_linebase): 
+        check_result = True
+
+        if self.current_fit != [np.array([False])] and rmse(new_fit, self.current_fit) > 100: 
+            check_result = False
+
+        if self.radius_of_curvature != None and rmse(new_curvature, self.radius_of_curvature) > 10: 
+            check_result = False
+
+        if self.line_base_pos != None and rmse(new_linebase, self.line_base_pos) > 10:
+            check_result = False
+
+        return check_result
+
+
+
