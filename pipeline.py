@@ -229,6 +229,13 @@ def plot_detected_lines(out_img, left_line, right_line):
     out_img[left_line.ally, left_line.allx] = [255, 0, 0]
     out_img[right_line.ally, right_line.allx] = [0, 0, 255]
 
+
+def put_text_on_img(img, curv, dist2left):
+    font = cv2.FONT_HERSHEY_SIMPLEX
+
+    cv2.putText(img,'Radius of curvature: {:2.2f} km'.format(curv),(200,100), font, 2,(255,255,255),2,cv2.LINE_AA)
+    cv2.putText(img,'Dist. to left line: {:2.2f} m'.format(dist2left),(200,180), font, 2,(255,255,255),2,cv2.LINE_AA)
+
 def rmse(value1, value2): 
     return np.sqrt(np.mean((value1-value2)**2))
 
@@ -286,6 +293,9 @@ img_warpback, perspective_M = perspective_change(img_linefit, reverse=True)
 
 # blend back-warped line plotting with undistored original image
 img_blended = cv2.addWeighted(img_undist, 0.7, img_warpback, 1.0, 0)
+
+# put text on image
+put_text_on_img(img_blended, (left_line.curvature+right_line.curvature)/2000, left_line.dist2line)
 
 # output intermediate steps 
 f, ((ax1,ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(3, 2, figsize=(24, 27))
@@ -420,12 +430,14 @@ def process_image(raw):
     leftl, rightl = tracer.getAvg()
     plot_detected_lines(img_linefit, leftl, rightl)
 
-
     # back-warp the line plotting
     img_warpback, perspective_M = perspective_change(img_linefit, reverse=True)
 
     # blend back-warped line plotting with undistored original image
     img_blended = cv2.addWeighted(img_undist, 0.7, img_warpback, 1.0, 0)
+    
+    # put text on image
+    put_text_on_img(img_blended, (leftl.curvature+rightl.curvature)/2000, leftl.dist2line)
 
     return img_blended
 

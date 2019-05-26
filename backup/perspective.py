@@ -17,7 +17,7 @@ def perspective_change(img):
 
 
 raw = mpimg.imread('test_images/straight_lines1.jpg')
-top_down, perspective_M = perspective_change(raw, 0, 0, 0, 0)
+top_down, perspective_M = perspective_change(raw)
 
 # plot the result
 f, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 9))
