@@ -246,7 +246,7 @@ def sanity_check(left_line, right_line):
     
     #print([check1, check2, check3])
     
-    if check1 < 1000 and check2 < 10 and check3 < 5000: 
+    if check1 < 1200 and check2 < 10 and check3 < 5000: 
         return True
     else:
         print("Sanity check failed")
@@ -445,7 +445,8 @@ def process_image(raw):
 tracer = LineTracer()
 
 #in_clip = VideoFileClip("project_video.mp4").subclip(0,2)
-in_clip = VideoFileClip("project_video.mp4")
+#in_clip = VideoFileClip("project_video.mp4")
+in_clip = VideoFileClip("challenge_video.mp4")
 #out_clip = in_clip.fl_image(process_image) #NOTE: this function expects color images!!
 new_frames = []
 for frame in in_clip.iter_frames():

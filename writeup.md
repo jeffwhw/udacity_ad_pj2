@@ -27,7 +27,7 @@ The goals / steps of this project are the following:
 
 [image6]: ./output_images/undistort-example.png "Image Calibration"
 [image7]: ./output_images/warp.png "Perspective Change"
-[image7]: ./output_images/pipeline.png "Perspective Change"
+[image8]: ./output_images/pipeline.png "Perspective Change"
 
 ## Description of the work
 
@@ -140,6 +140,10 @@ To take concrete steps, I built the "LineTracer" class. The class provides two m
 
 The result is stored then in [link to my second trial video](./output_images/project_video_second_run.mp4). We can observe that in difficult situation such as missing line marker and strong shadow, the algorithm is much more robust and gives reasonable estimation based on previous experiences. 
 
+#### 3. Challenge
+
+The algorithm works poorly on challenge video, but still in most cases offer a reasonable results. The result is stored then in [link to my second trial video](./output_images/challeng_trial.mp4)
+
 ---
 
 ### Discussion
@@ -147,3 +151,5 @@ The result is stored then in [link to my second trial video](./output_images/pro
 I have not yet optimized line finding algorithm based on sanity check result. Currently, searching points is started from scratch every time. This could be optimized later by searching only a small region based on the result of last search and sanity check. Nevertheless, it does not impact the performance of the algorithm so I passed over this feature for now. 
 
 Also, I will consider improve the smoothing algorithm. Currently, it simply drops the "bad" result. However, in situation where the results are "bad" for a long while and recovered to good again, this algorithm will store some very old valid result in its circular buffer and user will notice strange fitting at very beginning after recovery. This might be improved by recording also the bad results but using onlz the good results for line finding. 
+
+To improve the performance of algorithm in challenging situation, I will consider try better combination of edge detection, e.g. introducing some special edge detection characteristics for detecting hard road edge. 
