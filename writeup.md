@@ -25,7 +25,7 @@ The goals / steps of this project are the following:
 [video1]: ./output_images/project_video_first_run.mp4 "First Run"
 [video2]: ./output_images/project_video_second_run.mp4 "Second Run"
 
-[image6]: ./output_images/undistort.png "Image Calibration"
+[image6]: ./output_images/undistort-example.png "Image Calibration"
 [image7]: ./output_images/warp.png "Perspective Change"
 
 ## Description of the work
