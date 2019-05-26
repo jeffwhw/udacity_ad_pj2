@@ -207,21 +207,44 @@ def find_lanes(binary_warped):
     left_curverad, right_curverad, left_dist, right_dist = \
         measure_curvature_pixels(max_y, middle_x, left_fit, right_fit)
     #print(left_curverad, right_curverad, left_dist, right_dist)
-    
-    # plot the plane on the detected lines
-    for i in range(0,len(ploty)):
-        cv2.line(out_img, (left_fitx[i]+10,ploty[i]), (right_fitx[i]-10,ploty[i]), \
-            (0,100,0), 2)
-
-    # Colors in the left and right lane regions
-    out_img[lefty, leftx] = [255, 0, 0]
-    out_img[righty, rightx] = [0, 0, 255]
 
     # output all results to new line objects
     left_line = SingleLine(True, left_fit, left_fitx, ploty, left_curverad, left_dist, leftx, lefty)
     right_line = SingleLine(True, right_fit, right_fitx, ploty, right_curverad, right_dist, rightx, righty)
 
+    #sanity check
+    if sanity_check(left_line, right_line) == False:
+        left_line = SingleLine(False, None, None, None, None, None, None, None)
+        right_line = SingleLine(False, None, None, None, None, None, None, None)
+
     return out_img, [left_line, right_line]
+
+def plot_detected_lines(out_img, left_line, right_line):
+    # plot the plane on the detected lines
+    for i in range(0,len(left_line.fity)):
+        cv2.line(out_img, (left_line.fitx[i]+10,left_line.fity[i]), \
+            (right_line.fitx[i]-10,right_line.fity[i]), (0,100,0), 2)
+
+    # Colors in the left and right lane regions
+    out_img[left_line.ally, left_line.allx] = [255, 0, 0]
+    out_img[right_line.ally, right_line.allx] = [0, 0, 255]
+
+def rmse(value1, value2): 
+    return np.sqrt(np.mean((value1-value2)**2))
+
+def sanity_check(left_line, right_line):
+    check1 = rmse(left_line.curvature, right_line.curvature) 
+    check2 = rmse(left_line.dist2line, right_line.dist2line) 
+    check3 = rmse(left_line.fitx, right_line.fitx) 
+    
+    #print([check1, check2, check3])
+    
+    if check1 < 1000 and check2 < 10 and check3 < 5000: 
+        return True
+    else:
+        print("Sanity check failed")
+        print([check1, check2, check3])
+        return False
 
 #Calculates the curvature of polynomial functions in meters.
 def measure_curvature_pixels(max_y, middle_x, left_fit_cr, right_fit_cr):
@@ -255,7 +278,8 @@ img_topdown, perspective_M = perspective_change(img_edges)
 
 # find lines and calculate curvature
 img_linefit, [left_line, right_line] = find_lanes(img_topdown)
-print(vars(left_line))
+plot_detected_lines(img_linefit, left_line, right_line)
+#print(vars(left_line))
 
 # back-warp the line plotting
 img_warpback, perspective_M = perspective_change(img_linefit, reverse=True)
@@ -279,7 +303,105 @@ plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
 
 # Import everything needed to edit/save/watch video clips
 from moviepy.editor import VideoFileClip
+from moviepy.editor import ImageSequenceClip
+from moviepy.editor import ipython_display
 from IPython.display import HTML
+from ring_buffer import RingBuffer
+
+# Define a class to receive the characteristics of each line detection
+class LineTracer():
+    def __init__(self):
+        self.last5_left = RingBuffer(5)
+        self.last5_right = RingBuffer(5)
+        self.avg_left_fit = 0
+        self.avg_right_fit = 0
+        self.avg_left_curv = 0 
+        self.avg_right_curv = 0 
+        self.avg_left_dist = 0
+        self.avg_right_dist = 0
+
+    def getLastLeft(self):
+        return self.last5_left.get()[-1]
+
+    def getLastRight(self):
+        return self.last5_right.get()[-1]
+    
+    def getAvg(self):
+        left_list = self.last5_left.get()
+        right_list = self.last5_right.get()
+        num_lines = len(left_list)
+        #print(num_lines)
+        ploty = self.last5_left.get()[-1].fity
+
+        sum_curvl = 0
+        sum_curvr = 0
+        sum_distl = 0
+        sum_distr = 0
+        sum_fitl = [0, 0, 0]
+        sum_fitr = [0, 0, 0]
+
+        if num_lines > 0:
+            for left in left_list:
+                sum_curvl += left.curvature
+                sum_distl += left.dist2line
+                sum_fitl = np.add(sum_fitl, left.fit)
+            for right in right_list:
+                sum_curvr += right.curvature
+                sum_distr += right.dist2line
+                sum_fitr = np.add(sum_fitr, right.fit)
+
+        curvl = sum_curvl / num_lines
+        curvr = sum_curvr / num_lines
+        distl = sum_distl / num_lines
+        distr = sum_distr / num_lines
+        left_fit = np.divide(sum_fitl, num_lines)
+        right_fit = np.divide(sum_fitr, num_lines)
+        #print(left_fit)
+
+        # Draw the fit line plain
+        left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+        right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+
+        left_fitx = left_fitx.astype(int)
+        right_fitx = right_fitx.astype(int)
+
+        leftl = SingleLine(True,left_fit, left_fitx,ploty,curvl,distl,\
+            self.last5_left.get()[-1].allx, self.last5_left.get()[-1].ally)
+        rightl = SingleLine(True,right_fit, right_fitx,ploty,curvr,distr,\
+            self.last5_right.get()[-1].allx, self.last5_right.get()[-1].ally)
+
+        return leftl, rightl
+
+    def newLine(self, new_left, new_right):
+        if new_left.detected == False or new_right.detected == False:
+            #self.last5_left.append([False])
+            #self.last5_right.append([False])
+            pass
+        else:
+            self.last5_left.append(new_left)
+            self.last5_right.append(new_right)
+
+        left_list = self.last5_left.get()
+        right_list = self.last5_right.get()
+        num_lines = len(left_list)
+
+        if num_lines > 0:
+            for left in left_list:
+                #self.avg_left_fit = np.add(self.avg_left_fit, left.fit)
+                self.avg_left_curv += left.curvature
+                self.avg_left_dist += left.dist2line
+            for right in right_list:
+                #self.avg_right_fit = np.add(self.avg_right_fit, right.fit)
+                self.avg_right_curv += right.curvature
+                self.avg_right_dist += right.dist2line
+            
+            #self.avg_left_fit = np.divide(self.avg_left_fit, num_lines)
+            #self.avg_right_fit = np.divide(self.avg_right_fit, num_lines)
+            self.avg_left_curv /= num_lines
+            self.avg_right_curv /= num_lines
+            self.avg_left_dist /= num_lines
+            self.avg_right_dist /= num_lines
+    
 
 def process_image(raw):
     img_undist = undistort_image(raw, mtx, dist)
@@ -292,7 +414,13 @@ def process_image(raw):
 
     # find lines and calculate curvature
     img_linefit, [left_line, right_line] = find_lanes(img_topdown)
-    
+    tracer.newLine(left_line, right_line)
+    #if left_line.detected == True and right_line.detected == True:
+    #plot_detected_lines(img_linefit, tracer.getLastLeft(), tracer.getLastRight())
+    leftl, rightl = tracer.getAvg()
+    plot_detected_lines(img_linefit, leftl, rightl)
+
+
     # back-warp the line plotting
     img_warpback, perspective_M = perspective_change(img_linefit, reverse=True)
 
@@ -301,13 +429,20 @@ def process_image(raw):
 
     return img_blended
 
-white_output = 'output_images/project_video.mp4'
-clip1 = VideoFileClip("project_video.mp4").subclip(0,2)
-# clip1 = VideoFileClip("project_video.mp4")
-clip1.reader.close()
-clip1.audio.reader.close_proc()
-white_clip = clip1.fl_image(process_image) #NOTE: this function expects color images!!
-get_ipython().run_line_magic('time', 'white_clip.write_videofile(white_output, audio=False)')
+# create line tracer
+tracer = LineTracer()
+
+#in_clip = VideoFileClip("project_video.mp4").subclip(0,2)
+in_clip = VideoFileClip("project_video.mp4")
+#out_clip = in_clip.fl_image(process_image) #NOTE: this function expects color images!!
+new_frames = []
+for frame in in_clip.iter_frames():
+    new_frame = process_image(frame)
+    new_frames.append(new_frame)
+out_clip = ImageSequenceClip(new_frames, fps = 25)
+out_clip.write_videofile('output_images/project_video.mp4')
+#ipython_display(out_clip)
+
 
 
 #%%
