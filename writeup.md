@@ -19,14 +19,15 @@ The goals / steps of this project are the following:
 
 [image1]: ./output_images/undistort.png "Undistorted"
 [image2]: ./output_images/edge_detected.png "Edge Detected"
-[image3]: ./output_images/top-down.png "Top Down View"
+[image3]: ./output_images/topdown.png "Top Down View"
 [image4]: ./output_images/linefit.png "Line detected and fit"
-[image5]: ./output_images/blended.jpg "Warp back to original view and blended over"
+[image5]: ./output_images/blended.png "Warp back to original view and blended over"
 [video1]: ./output_images/project_video_first_run.mp4 "First Run"
 [video2]: ./output_images/project_video_second_run.mp4 "Second Run"
 
 [image6]: ./output_images/undistort-example.png "Image Calibration"
 [image7]: ./output_images/warp.png "Perspective Change"
+[image7]: ./output_images/pipeline.png "Perspective Change"
 
 ## Description of the work
 
@@ -34,7 +35,7 @@ The goals / steps of this project are the following:
 
 [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
 
-I have started with invididual steps such as calibration, perspective transform etc. Each individual function is tested using the given sample images. After testing them all, I combined all the code in a single file: pipeline.py. I built first a test run which combines all these steps together. After the test run is working, I started with video. 
+I have started with invididual steps such as calibration, perspective transform etc. Each individual function is tested using the given sample images. After testing them all, I combined all the code in a single file: pipeline.py. I built first a test run (line 273 to line 311) in "pipeline.py"), which combines all these steps together. After the test run is working, I started with video. 
 
 The first trial on video was successful and recorded in "./output_images/project_video_first_run.mp4". The results seem to be very reasonable except that the detection encounters some disturtance when the line is missing for some time or there is strong shadow on the ground. Therefore, I built a second run which adds smoothing function and sanity check. These mechanisms filtered out the unreasonable results and smooth the output. The second run achieved a much better result in the above mentioned scenarios. It is recored in "./output_images/project_video_second_run.mp4". 
 
@@ -90,25 +91,40 @@ Following picture gives an example of the real captured frame after perspective 
 
 #### 4. Find the left and right lines 
 
-Line finding algorithm 
+Line finding algorithm (in "find_lanes()" function) has several steps built-in: 
+1) it searchs for points of left and right lines using histogram and interactive windows. This step outputs "leftx", "lefty", "rightx" and "righty" in "find_lanes()". 
+2) after the points are collected for both lines, it fits the points into a 2nd order polinomial equation, i.e. ax**2 + bx + c. This step outputs "left_fit" and "right_fit" in "find_lanes()". 
+3) the algorithm then recalculates the points using the polinomial. This step outputs "ploty", "left_fitx" and "right_fitx" in "find_lanes()". 
+4) the algorithm will caculate the radius of curverad and distance to the line, for both left and right lines. This function is given in "measure_curvature_pixels()". 
+5) finally, the algorithm checks the sanity of the found lines. This function is given by "sanity_check". If checks succeed, found lines will be stored into two new Line objects, with "detected" value set to "True"; otherwise, algorithm gives two empty lines with "detected" value set to "False". 
+
+"plot_detected_lines" will paint the found lines and line points on the top-down view image calculated in the last step. The green area points the discovered lane betwen left and right lines. Red and blue dots illustrate the original found line points. An example is given below: 
+
+![alt text][image4]
+
+#### 5. The image with discovered lane painted will be warped back to original perspective of camera and blended over the original image
+
+Warping-back is easily implemented by reverse using of "perspective_change()", simply exchaging the source and destination points. 
+
+Blending over original image can be achieved using "addWeighted()" from OpenCV.
+
+Finally, texts about the radius of curvature and distance to left lines are put on the outputted image. An example is given below: 
 
 ![alt text][image5]
 
-#### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
+#### Summary
 
-I did this in lines # through # in my code in `my_other_file.py`
+We can take an overview of the complete pipleline again in the combined picture: 
 
-#### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
-
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
-
-![alt text][image6]
-
----
+![alt text][image8]
 
 ### Pipeline (video)
 
-#### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
+#### 1. First Trial
+
+My first trial starts with simply packing the pipeline mentioned in last section into a function called "process_image()". The result is stored in 
+
+![alt text][video1]
 
 Here's a [link to my video result](./project_video.mp4)
 
