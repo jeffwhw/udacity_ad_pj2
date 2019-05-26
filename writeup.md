@@ -122,16 +122,28 @@ We can take an overview of the complete pipleline again in the combined picture:
 
 #### 1. First Trial
 
-My first trial starts with simply packing the pipeline mentioned in last section into a function called "process_image()". The result is stored in 
+My first trial starts with simply packing the pipeline mentioned in last section into a function called "process_image()". The result is stored in [link to my first trial video](./output_images/project_video_first_run.mp4). 
 
-![alt text][video1]
+The results seem to be very reasonable except that the detection encounters some disturtance when the line is missing for some time or there is strong shadow on the ground.
 
-Here's a [link to my video result](./project_video.mp4)
+#### 2. Smoothing and Line Tracing 
+
+After first trial, I started to think the optimization. The basic idea is to build a simple LP filter, which outputs the average of last 5 results. Also, I planned to use sanity check to remove "bad" results. 
+
+To take concrete steps, I built the "LineTracer" class. The class provides two major function: "newLine()" and "getAvg()". 
+
+"newLine()" function takes the newly found lines in current iteration. It will take only "good" result which passed the sanity check. 
+
+"getAvg()" function returns a pair of "artificial" lines which averages over the last 5 iterations. Concretely, it will calculate the average polinomial coefficiencies, the distances to left/right lines and the radius of curvature. After that, it calculates the newly fitted points and return the artificial lines. 
+
+"LineTracer" class allows me to simply exchange the lines returned by "find_lanes()" by the artificial lines given by "LineTracer" class. These lines are passed to the "plot_detected_lines()" and "put_text_on_img()" functions. Therefore, the result image will be changed to the filterred lines. 
+
+The result is stored then in [link to my second trial video](./output_images/project_video_second_run.mp4). We can observe that in difficult situation such as missing line marker and strong shadow, the algorithm is much more robust and gives reasonable estimation based on previous experiences. 
 
 ---
 
 ### Discussion
 
-#### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
+I have not yet optimized line finding algorithm based on sanity check result. Currently, searching points is started from scratch every time. This could be optimized later by searching only a small region based on the result of last search and sanity check. Nevertheless, it does not impact the performance of the algorithm so I passed over this feature for now. 
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+Also, I will consider improve the smoothing algorithm. Currently, it simply drops the "bad" result. However, in situation where the results are "bad" for a long while and recovered to good again, this algorithm will store some very old valid result in its circular buffer and user will notice strange fitting at very beginning after recovery. This might be improved by recording also the bad results but using onlz the good results for line finding. 
