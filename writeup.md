@@ -1,6 +1,11 @@
-## Writeup Template
+## Writeup of Project2 of Udacity Self-Driving Car Nanodegree
 
 ---
+
+** Update **
+
+Correct the calculation of distance to lines. Previously the wrong parameters was passed to the caculation function. Please check [link to my second trial video](./output_images/project_video_second_run.mp4).
+
 
 **Advanced Lane Finding Project**
 

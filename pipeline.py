@@ -204,8 +204,8 @@ def find_lanes(binary_warped):
     # calculate curverad and distance
     middle_x = int(out_img.shape[1]/2)
     max_y = np.max(out_img.shape[0])
-    left_curverad, right_curverad, left_dist, right_dist = \
-        measure_curvature_pixels(max_y, middle_x, left_fit, right_fit)
+    left_curverad, right_curverad = measure_curvature_pixels(max_y, left_fit, right_fit)
+    left_dist, right_dist = measure_distance_to_line(middle_x, left_fitx, right_fitx)
     #print(left_curverad, right_curverad, left_dist, right_dist)
 
     # output all results to new line objects
@@ -254,7 +254,7 @@ def sanity_check(left_line, right_line):
         return False
 
 #Calculates the curvature of polynomial functions in meters.
-def measure_curvature_pixels(max_y, middle_x, left_fit_cr, right_fit_cr):
+def measure_curvature_pixels(max_y, left_fit_cr, right_fit_cr):
     # Define conversions in x and y from pixels space to meters
     ym_per_pix = 30/720 # meters per pixel in y dimension
     xm_per_pix = 3.7/700 # meters per pixel in x dimension
@@ -264,11 +264,16 @@ def measure_curvature_pixels(max_y, middle_x, left_fit_cr, right_fit_cr):
         / np.abs(2*left_fit_cr[0])  
     right_curverad = (1 + (2*right_fit_cr[0]*max_y*ym_per_pix + right_fit_cr[1])**2)**1.5  \
         / np.abs(2*right_fit_cr[0])  
-    
-    left_dist = np.abs(middle_x-left_fit_cr[0])*xm_per_pix
-    right_dist = np.abs(middle_x-right_fit_cr[0])*xm_per_pix
 
-    return left_curverad, right_curverad, left_dist, right_dist
+    return left_curverad, right_curverad
+
+def measure_distance_to_line(middle_x, left_fitx, right_fitx):
+    xm_per_pix = 3.7/700 # meters per pixel in x dimension
+
+    left_dist = np.abs(middle_x-left_fitx[0])*xm_per_pix
+    right_dist = np.abs(middle_x-right_fitx[0])*xm_per_pix
+
+    return left_dist, right_dist
 
 #%%
 
@@ -445,8 +450,8 @@ def process_image(raw):
 tracer = LineTracer()
 
 #in_clip = VideoFileClip("project_video.mp4").subclip(0,2)
-#in_clip = VideoFileClip("project_video.mp4")
-in_clip = VideoFileClip("challenge_video.mp4")
+in_clip = VideoFileClip("project_video.mp4")
+#in_clip = VideoFileClip("challenge_video.mp4")
 #out_clip = in_clip.fl_image(process_image) #NOTE: this function expects color images!!
 new_frames = []
 for frame in in_clip.iter_frames():
