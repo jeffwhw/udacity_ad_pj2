@@ -13,7 +13,8 @@ test_perspective = False
 test_fitpoly = False
 test_curve = False
 
-os.chdir('F:\\code\\udacity_carnd\\Project2\\udacity_ad_pj2')
+#os.chdir('F:\\code\\udacity_carnd\\Project2\\udacity_ad_pj2')
+os.chdir('D:\\Code\\udacity\\udacity_ad_pj2')
 
 #%% prepare the calibration data based on calibration images
 def calibrate_prepare(images):
@@ -107,12 +108,10 @@ def perspective_change(img, reverse = False):
 
 from line_class import SingleLine
 
-# find line points and fit to 2D polynomial
-def find_lanes(binary_warped):
+def search_histogram(binary_warped):
     # Take a histogram of the bottom half of the image
     histogram = np.sum(binary_warped[binary_warped.shape[0]//2:,:], axis=0)
-    # Create an output image to draw on and visualize the result
-    out_img = np.dstack((binary_warped, binary_warped, binary_warped))
+
     # Find the peak of the left and right halves of the histogram
     # These will be the starting point for the left and right lines
     midpoint = np.int(histogram.shape[0]//2)
@@ -120,12 +119,9 @@ def find_lanes(binary_warped):
     rightx_base = np.argmax(histogram[midpoint:]) + midpoint
 
     # HYPERPARAMETERS
-    # Choose the number of sliding windows
-    nwindows = 9
-    # Set the width of the windows +/- margin
-    margin = 100
-    # Set minimum number of pixels found to recenter window
-    minpix = 50
+    nwindows = 9 # Choose the number of sliding windows    
+    margin = 100 # Set the width of the windows +/- margin    
+    minpix = 50 # Set minimum number of pixels found to recenter window
 
     # Set height of windows - based on nwindows above and image shape
     window_height = np.int(binary_warped.shape[0]//nwindows)
@@ -179,14 +175,56 @@ def find_lanes(binary_warped):
     # Extract left and right line pixel positions
     leftx = nonzerox[left_lane_inds]
     lefty = nonzeroy[left_lane_inds] 
+    rightx = nonzerox[right_lane_inds] 
+    righty = nonzeroy[right_lane_inds] 
+
+    return leftx, lefty, rightx, righty
+
+def search_around_poly(binary_warped, left_fit, right_fit):
+    # HYPERPARAMETER
+    # Choose the width of the margin around the previous polynomial to search
+    # The quiz grader expects 100 here, but feel free to tune on your own!
+    margin = 100
+
+    # Grab activated pixels
+    nonzero = binary_warped.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+    
+    # Set the area of search based on activated x-values within the +/- margin of our polynomial function
+    left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + 
+                    left_fit[2] - margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + 
+                    left_fit[1]*nonzeroy + left_fit[2] + margin)))
+    right_lane_inds = ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + 
+                    right_fit[2] - margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + 
+                    right_fit[1]*nonzeroy + right_fit[2] + margin)))
+    
+    # Again, extract left and right line pixel positions
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds] 
     rightx = nonzerox[right_lane_inds]
     righty = nonzeroy[right_lane_inds]
 
+    return leftx, lefty, rightx, righty
+   
+
+# find line points and fit to 2D polynomial
+def find_lanes(binary_warped, pre_lines):
+
+    if pre_lines == None:
+        leftx, lefty, rightx, righty = search_histogram(binary_warped)
+    else: 
+        if pre_lines[0].detected == False or pre_lines[1].detected == False:
+            leftx, lefty, rightx, righty = search_histogram(binary_warped)
+        else:
+            leftx, lefty, rightx, righty = search_around_poly(binary_warped, pre_lines[0].fit, pre_lines[1].fit)        
+    
     # Fit a second order polynomial to each 
     left_fit = np.polyfit(lefty, leftx, 2)
     right_fit = np.polyfit(righty, rightx, 2)
 
-    # Draw the fit line plain
+    # Create an output image to draw on and visualize the result
+    out_img = np.dstack((binary_warped, binary_warped, binary_warped))
     ploty = np.linspace(0, out_img.shape[0]-1, out_img.shape[0] )
     try:
         left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
@@ -204,7 +242,7 @@ def find_lanes(binary_warped):
     # calculate curverad and distance
     middle_x = int(out_img.shape[1]/2)
     max_y = np.max(out_img.shape[0])
-    left_curverad, right_curverad = measure_curvature_pixels(max_y, left_fit, right_fit)
+    left_curverad, right_curverad = measure_curvature(leftx, lefty, rightx, righty, max_y)
     left_dist, right_dist = measure_distance_to_line(middle_x, left_fitx, right_fitx)
     #print(left_curverad, right_curverad, left_dist, right_dist)
 
@@ -214,10 +252,15 @@ def find_lanes(binary_warped):
 
     #sanity check
     if sanity_check(left_line, right_line) == False:
-        left_line = SingleLine(False, None, None, None, None, None, None, None)
-        right_line = SingleLine(False, None, None, None, None, None, None, None)
+        left_line, right_line = generate_empty_lines()
 
     return out_img, [left_line, right_line]
+
+def generate_empty_lines(): 
+    left_line = SingleLine(False, None, None, None, None, None, None, None)
+    right_line = SingleLine(False, None, None, None, None, None, None, None)
+
+    return left_line, right_line
 
 def plot_detected_lines(out_img, left_line, right_line):
     # plot the plane on the detected lines
@@ -229,12 +272,11 @@ def plot_detected_lines(out_img, left_line, right_line):
     out_img[left_line.ally, left_line.allx] = [255, 0, 0]
     out_img[right_line.ally, right_line.allx] = [0, 0, 255]
 
-
-def put_text_on_img(img, curv, dist2left):
+def put_text_on_img(img, curv, dist2center):
     font = cv2.FONT_HERSHEY_SIMPLEX
 
     cv2.putText(img,'Radius of curvature: {:2.2f} km'.format(curv),(200,100), font, 2,(255,255,255),2,cv2.LINE_AA)
-    cv2.putText(img,'Dist. to left line: {:2.2f} m'.format(dist2left),(200,180), font, 2,(255,255,255),2,cv2.LINE_AA)
+    cv2.putText(img,'Dist. to center: {:2.2f} m'.format(dist2center),(200,180), font, 2,(255,255,255),2,cv2.LINE_AA)
 
 def rmse(value1, value2): 
     return np.sqrt(np.mean((value1-value2)**2))
@@ -246,7 +288,7 @@ def sanity_check(left_line, right_line):
     
     #print([check1, check2, check3])
     
-    if check1 < 1200 and check2 < 10 and check3 < 5000: 
+    if check1 < 10000 and check2 < 10 and check3 < 5000: 
         return True
     else:
         print("Sanity check failed")
@@ -254,26 +296,39 @@ def sanity_check(left_line, right_line):
         return False
 
 #Calculates the curvature of polynomial functions in meters.
-def measure_curvature_pixels(max_y, left_fit_cr, right_fit_cr):
+def measure_curvature(leftx, lefty, rightx, righty, max_y):
     # Define conversions in x and y from pixels space to meters
     ym_per_pix = 30/720 # meters per pixel in y dimension
     xm_per_pix = 3.7/700 # meters per pixel in x dimension
 
-    # Implement the calculation of R_curve (radius of curvature)
-    left_curverad = (1 + (2*left_fit_cr[0]*max_y*ym_per_pix + left_fit_cr[1])**2)**1.5  \
-        / np.abs(2*left_fit_cr[0])  
-    right_curverad = (1 + (2*right_fit_cr[0]*max_y*ym_per_pix + right_fit_cr[1])**2)**1.5  \
-        / np.abs(2*right_fit_cr[0])  
+    # convert fit in pixel to fit in meters
+    leftx_real = leftx * xm_per_pix
+    rightx_real = leftx * xm_per_pix
+    lefty_real = lefty * ym_per_pix
+    righty_real = lefty * ym_per_pix
 
-    return left_curverad, right_curverad
+    # fit the points in meters in new polinomial 
+    left_fit_cr = np.polyfit(lefty_real, leftx_real, 2)
+    right_fit_cr = np.polyfit(righty_real, rightx_real, 2)
+    y_cr = max_y * ym_per_pix
+
+    # Implement the calculation of R_curve (radius of curvature)
+    left_cur = (1 + (2*left_fit_cr[0]*y_cr + left_fit_cr[1])**2)**1.5 / np.abs(2*left_fit_cr[0])  
+    right_cur = (1 + (2*right_fit_cr[0]*y_cr + right_fit_cr[1])**2)**1.5 / np.abs(2*right_fit_cr[0])  
+
+    return left_cur, right_cur
 
 def measure_distance_to_line(middle_x, left_fitx, right_fitx):
     xm_per_pix = 3.7/700 # meters per pixel in x dimension
 
-    left_dist = np.abs(middle_x-left_fitx[0])*xm_per_pix
-    right_dist = np.abs(middle_x-right_fitx[0])*xm_per_pix
+    left_dist = np.abs(middle_x-left_fitx[-1])*xm_per_pix
+    right_dist = np.abs(middle_x-right_fitx[-1])*xm_per_pix
 
     return left_dist, right_dist
+
+def measure_deviation_left(left_dist, right_dist):
+    mid = (left_dist + right_dist)/2
+    return mid-left_dist
 
 #%%
 
@@ -289,7 +344,8 @@ color_binary, img_edges = detc_edge(img_undist)
 img_topdown, perspective_M = perspective_change(img_edges)
 
 # find lines and calculate curvature
-img_linefit, [left_line, right_line] = find_lanes(img_topdown)
+left_line, right_line = generate_empty_lines()
+img_linefit, [left_line, right_line] = find_lanes(img_topdown, [left_line, right_line])
 plot_detected_lines(img_linefit, left_line, right_line)
 #print(vars(left_line))
 
@@ -300,7 +356,8 @@ img_warpback, perspective_M = perspective_change(img_linefit, reverse=True)
 img_blended = cv2.addWeighted(img_undist, 0.7, img_warpback, 1.0, 0)
 
 # put text on image
-put_text_on_img(img_blended, (left_line.curvature+right_line.curvature)/2000, left_line.dist2line)
+put_text_on_img(img_blended, (left_line.curvature+right_line.curvature)/2000, \
+    measure_deviation_left(left_line.dist2line, right_line.dist2line))
 
 # output intermediate steps 
 f, ((ax1,ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(3, 2, figsize=(24, 27))
@@ -335,12 +392,12 @@ class LineTracer():
         self.avg_left_dist = 0
         self.avg_right_dist = 0
 
-    def getLastLeft(self):
-        return self.last5_left.get()[-1]
+    def getLast(self):
+        if len(self.last5_left.get()) > 0 and len(self.last5_right.get()) > 0:
+            return [self.last5_left.get()[-1], self.last5_right.get()[-1]]
+        else:
+            return generate_empty_lines()
 
-    def getLastRight(self):
-        return self.last5_right.get()[-1]
-    
     def getAvg(self):
         left_list = self.last5_left.get()
         right_list = self.last5_right.get()
@@ -418,7 +475,7 @@ class LineTracer():
             self.avg_right_dist /= num_lines
     
 
-def process_image(raw):
+def process_image(raw, pre_lines):
     img_undist = undistort_image(raw, mtx, dist)
 
     # detect edges
@@ -428,10 +485,8 @@ def process_image(raw):
     img_topdown, perspective_M = perspective_change(img_edges)
 
     # find lines and calculate curvature
-    img_linefit, [left_line, right_line] = find_lanes(img_topdown)
+    img_linefit, [left_line, right_line] = find_lanes(img_topdown, pre_lines)
     tracer.newLine(left_line, right_line)
-    #if left_line.detected == True and right_line.detected == True:
-    #plot_detected_lines(img_linefit, tracer.getLastLeft(), tracer.getLastRight())
     leftl, rightl = tracer.getAvg()
     plot_detected_lines(img_linefit, leftl, rightl)
 
@@ -442,7 +497,8 @@ def process_image(raw):
     img_blended = cv2.addWeighted(img_undist, 0.7, img_warpback, 1.0, 0)
     
     # put text on image
-    put_text_on_img(img_blended, (leftl.curvature+rightl.curvature)/2000, leftl.dist2line)
+    put_text_on_img(img_blended, (leftl.curvature+rightl.curvature)/2000, \
+        measure_deviation_left(leftl.dist2line, rightl.dist2line))
 
     return img_blended
 
@@ -455,7 +511,7 @@ in_clip = VideoFileClip("project_video.mp4")
 #out_clip = in_clip.fl_image(process_image) #NOTE: this function expects color images!!
 new_frames = []
 for frame in in_clip.iter_frames():
-    new_frame = process_image(frame)
+    new_frame = process_image(frame, tracer.getLast())
     new_frames.append(new_frame)
 out_clip = ImageSequenceClip(new_frames, fps = 25)
 out_clip.write_videofile('output_images/project_video.mp4')

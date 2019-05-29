@@ -2,6 +2,18 @@
 
 ---
 
+** Update2 **
+
+This update brings several modifcations based on the review result: 
+
+1) Correct the calculation of center deviation. Previous calculation is targeted at the wrong object. Intead of calculation of the vehicle center to the left line, I corrected it now to the deviation of the vehicle center left to the center of lane. 
+
+2) Correct the calculation of radius of curvature. This time, I convered first the found points from pixel to meters. Then I re-calculate the polinomial coefficient. Finally, I use this new coefficients to calculate the curvature. 
+
+3) Optimize the lane searching algorithm. Based on the result of last searching,the algorithm searchs either based on histogram (fresh start or damaged lane detection in last iteration) or the surrond area of last found lines. For this purpose, I created a new function "search_around_poly()". 
+
+Please check [link to my second trial video](./output_images/project_video_second_run.mp4) for the final result. 
+
 ** Update **
 
 Correct the calculation of distance to lines. Previously the wrong parameters was passed to the caculation function. Please check [link to my second trial video](./output_images/project_video_second_run.mp4).
